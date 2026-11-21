@@ -137,6 +137,11 @@ export async function exchangeRefreshToken(account: ParsedCredential): Promise<T
             return await exchangeRefreshTokenWithScope(account, scope, mode)
         } catch (error) {
             lastError = error
+            // A rejected refresh token cannot be repaired by changing scopes.
+            // Stop here instead of generating three identical 400 requests.
+            if (error instanceof Error && error.message.includes("[invalid_grant]")) {
+                throw error
+            }
         }
     }
 

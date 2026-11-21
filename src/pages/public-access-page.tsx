@@ -4,6 +4,7 @@ import { Check, Clock3, Copy, KeyRound, LogOut, MailCheck, RefreshCcw, ShieldChe
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { decryptAccount, type EncryptedAccountRecord } from "@/lib/crypto"
+import type { ParsedCredential } from "@/lib/validation"
 import { exchangeRefreshToken, fetchInbox, fetchMessageDetail, getFriendlyEmailError, type InboxMessage, type MessageDetail } from "@/lib/graph"
 import {
     claimPublicAccessMessage,
@@ -45,6 +46,7 @@ export function PublicAccessPage() {
     const [error, setError] = useState<string | null>(null)
     const [copied, setCopied] = useState(false)
     const polling = useRef(false)
+    const credentialRef = useRef<ParsedCredential | null>(null)
 
     useEffect(() => {
         const restore = async () => {
@@ -78,8 +80,13 @@ export function PublicAccessPage() {
         setError(null)
 
         try {
-            const credential = await decryptAccount(toEncryptedRecord(activeSession), activeSession.access_key)
+            const credential = credentialRef.current ?? await decryptAccount(toEncryptedRecord(activeSession), activeSession.access_key)
             const auth = await exchangeRefreshToken(credential)
+            if (auth.refreshToken && auth.refreshToken !== credential.refreshToken) {
+                credentialRef.current = { ...credential, refreshToken: auth.refreshToken }
+            } else if (!credentialRef.current) {
+                credentialRef.current = credential
+            }
             let discoveredMessages: InboxMessage[] = []
 
             let messageId = activeSession.claimed_message_id
@@ -159,6 +166,7 @@ export function PublicAccessPage() {
             sessionStorage.setItem(SESSION_SECRET_KEY, secret)
             setSessionSecret(secret)
             setSession(nextSession)
+            credentialRef.current = null
             setToken("")
         } catch (caught) {
             const detail = caught instanceof Error ? caught.message : "Token tidak valid atau sudah digunakan"
@@ -177,6 +185,7 @@ export function PublicAccessPage() {
         setMessage(null)
         setError(null)
         setCopied(false)
+        credentialRef.current = null
     }
 
     const copyOwnerEmail = async () => {

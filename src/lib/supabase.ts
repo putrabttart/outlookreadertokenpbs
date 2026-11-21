@@ -431,17 +431,36 @@ export async function addAdminManagedAccount(credentialString: string): Promise<
     if (!session?.user.id) throw new Error("Admin belum login")
 
     const parsed = parseCredentialString(credentialString)
-    const encrypted = await encryptAccount(parsed, accessKey)
+    const existingAccounts = await loadAdminAccounts()
+    if (existingAccounts.some((account) => account.email.trim().toLowerCase() === parsed.email.trim().toLowerCase())) {
+        throw new Error(`Akun ${parsed.email} sudah ada di daftar admin`)
+    }
+
+    // Validate Microsoft credentials before writing anything to Supabase.
+    // This prevents invalid accounts from appearing in the admin list.
+    const token = await exchangeRefreshToken(parsed)
+    const inbox = await fetchInbox(token.accessToken)
+    const credentialToStore = token.refreshToken
+        ? { ...parsed, refreshToken: token.refreshToken }
+        : parsed
+    const encrypted = await encryptAccount(credentialToStore, accessKey)
 
     const { error } = await supabase
         .from("encrypted_accounts")
         .insert(toAdminManagedRow(encrypted, session.user.id))
 
-    if (error) throw error
+    if (error) {
+        if (error.code === "23505") {
+            throw new Error(`Akun ${parsed.email} sudah ada di daftar admin`)
+        }
+        throw error
+    }
 
-    const token = await exchangeRefreshToken(parsed)
-    const inbox = await fetchInbox(token.accessToken)
-    await logInboxMessages(encrypted, inbox.messages)
+    try {
+        await logInboxMessages(encrypted, inbox.messages)
+    } catch (logError) {
+        console.warn("Akun berhasil ditambahkan, tetapi inbox awal gagal dicatat:", logError)
+    }
 
     return inbox.messages.length
 }
