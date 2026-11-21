@@ -8,7 +8,6 @@ import {
     AdminShell,
     InboxLogTable,
     LatestLogsPreview,
-    SettingsPanel,
     StatCards,
 } from "@/components/admin/admin-dashboard"
 import {
@@ -21,11 +20,9 @@ import {
     isCurrentUserAdmin,
     isSupabaseConfigured,
     loadAdminAccounts,
-    loadAdminAccessKey,
     loadAdminAccessTokens,
     loadAdminInboxLogs,
     revokeAdminAccessToken,
-    updateAdminAccessKey,
     type AccountAccessTokenRow,
     type InboxLogRow,
     type SupabaseAccountRow,
@@ -41,26 +38,21 @@ export function AdminPage() {
     const [logs, setLogs] = useState<InboxLogRow[]>([])
     const [selectedAccountId, setSelectedAccountId] = useState("")
     const [newAccountCredential, setNewAccountCredential] = useState("")
-    const [currentAccessKey, setCurrentAccessKey] = useState("")
-    const [nextAccessKey, setNextAccessKey] = useState("")
-    const [hasAccessKey, setHasAccessKey] = useState(false)
     const [accessTokens, setAccessTokens] = useState<AccountAccessTokenRow[]>([])
     const [generatedToken, setGeneratedToken] = useState<string | null>(null)
 
     const loadAdminData = async () => {
         setLoading(true)
         try {
-            const [accountRows, logRows, accessKey, tokenRows] = await Promise.all([
+            const [accountRows, logRows, tokenRows] = await Promise.all([
                 loadAdminAccounts(),
                 // Logs are global admin history; accountId only controls the
                 // selected account/token management view.
                 loadAdminInboxLogs(),
-                loadAdminAccessKey(),
                 loadAdminAccessTokens(),
             ])
             setAccounts(accountRows)
             setLogs(logRows)
-            setHasAccessKey(Boolean(accessKey))
             setAccessTokens(tokenRows)
         } catch (error: unknown) {
             toast.error(error instanceof Error ? error.message : "Gagal memuat data admin")
@@ -206,22 +198,6 @@ export function AdminPage() {
         }
     }
 
-    const handleUpdateAccessKey = async (event: React.FormEvent) => {
-        event.preventDefault()
-        setLoading(true)
-        try {
-            await updateAdminAccessKey(currentAccessKey, nextAccessKey)
-            setCurrentAccessKey("")
-            setNextAccessKey("")
-            setHasAccessKey(true)
-            toast.success("Kunci akses bersama berhasil diperbarui")
-        } catch (error: unknown) {
-            toast.error(error instanceof Error ? error.message : "Gagal memperbarui kunci akses")
-        } finally {
-            setLoading(false)
-        }
-    }
-
     if (!isSupabaseConfigured) return <AdminMissingConfig />
 
     if (!isAdmin) {
@@ -294,20 +270,6 @@ export function AdminPage() {
                             accounts={accounts}
                             selectedAccountId={selectedAccountId}
                             onFilterChange={handleFilterChange}
-                        />
-                    }
-                />
-                <Route
-                    path="settings"
-                    element={
-                        <SettingsPanel
-                            loading={loading}
-                            hasAccessKey={hasAccessKey}
-                            currentAccessKey={currentAccessKey}
-                            nextAccessKey={nextAccessKey}
-                            onCurrentAccessKeyChange={setCurrentAccessKey}
-                            onNextAccessKeyChange={setNextAccessKey}
-                            onUpdateAccessKey={handleUpdateAccessKey}
                         />
                     }
                 />

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { decryptAccount } from "@/lib/crypto"
 import { exchangeRefreshToken, fetchMessageDetail, type MessageDetail } from "@/lib/graph"
 import { loadAdminAccessKey, type AccountAccessTokenRow, type InboxLogRow, type SupabaseAccountRow } from "@/lib/supabase"
-import { Copy, KeyRound, LayoutDashboard, LockKeyhole, Mail, RefreshCcw, Settings, ShieldCheck, Trash2, Users, XCircle } from "lucide-react"
+import { Copy, KeyRound, LayoutDashboard, LockKeyhole, Mail, RefreshCcw, ShieldCheck, Trash2, Users, XCircle } from "lucide-react"
 import { NavLink } from "react-router-dom"
 import DOMPurify from "dompurify"
 
@@ -34,16 +34,6 @@ export interface AdminDashboardProps {
     onFilterChange: (accountId: string) => void
     onClearFilter: () => void
     onDeleteAccount: (accountId: string) => void
-}
-
-interface SettingsPanelProps {
-    loading: boolean
-    hasAccessKey: boolean
-    currentAccessKey: string
-    nextAccessKey: string
-    onCurrentAccessKeyChange: (value: string) => void
-    onNextAccessKeyChange: (value: string) => void
-    onUpdateAccessKey: (event: React.FormEvent) => void
 }
 
 export function AdminMissingConfig() {
@@ -105,7 +95,6 @@ function AdminSidebar() {
                 <NavLink to="/admin/add-account" className={adminNavClass}><LockKeyhole className="h-4 w-4" /> Tambah Akun</NavLink>
                 <NavLink to="/admin/accounts" className={adminNavClass}><Users className="h-4 w-4" /> Akun</NavLink>
                 <NavLink to="/admin/logs" className={adminNavClass}><Mail className="h-4 w-4" /> Log Email</NavLink>
-                <NavLink to="/admin/settings" className={adminNavClass}><Settings className="h-4 w-4" /> Pengaturan</NavLink>
             </nav>
             <div className="border-t-3 border-foreground bg-[#DB8291] p-4 text-xs font-black text-[#720002]">Data akun tetap terenkripsi di Supabase.</div>
         </aside>
@@ -138,7 +127,6 @@ function AdminBottomBar() {
         { to: "/admin/add-account", label: "Tambah", icon: LockKeyhole },
         { to: "/admin/accounts", label: "Akun", icon: Users },
         { to: "/admin/logs", label: "Log", icon: Mail },
-        { to: "/admin/settings", label: "Setting", icon: Settings },
     ]
 
     return (
@@ -200,51 +188,19 @@ export function StatCards({ accounts, logs, selectedAccountId, onFilterChange }:
     )
 }
 
-export function SettingsPanel({ loading, hasAccessKey, currentAccessKey, nextAccessKey, onCurrentAccessKeyChange, onNextAccessKeyChange, onUpdateAccessKey }: SettingsPanelProps) {
-    return (
-        <div className="grid gap-6 lg:grid-cols-2">
-            <Card className="brand-panel-berry">
-                <CardHeader>
-                    <CardTitle>Flow Aktif</CardTitle>
-                    <CardDescription>Ringkasan cara aplikasi utama bekerja setelah refactor admin.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3 text-sm text-muted-foreground">
-                    <p>1. Admin menambahkan akun Outlook dari halaman Tambah Akun.</p>
-                    <p>2. Akun disimpan terenkripsi di Supabase sebagai admin-managed account.</p>
-                    <p>3. Admin membuat satu atau beberapa token pada card akun.</p>
-                    <p>4. User memasukkan token dan menunggu satu email baru sesuai urutan FIFO.</p>
-                </CardContent>
-            </Card>
-            <Card className="brand-panel-berry">
-                <CardHeader>
-                    <CardTitle>Kunci Akses Bersama</CardTitle>
-                    <CardDescription>Satu kunci dipakai untuk semua akun Outlook. Saat diganti, semua akun akan dienkripsi ulang otomatis.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <form onSubmit={onUpdateAccessKey} className="grid gap-3 md:grid-cols-3">
-                        {hasAccessKey && <Input type="password" placeholder="Kunci akses saat ini" value={currentAccessKey} onChange={(event) => onCurrentAccessKeyChange(event.target.value)} />}
-                        <Input type="password" placeholder={hasAccessKey ? "Kunci akses baru" : "Buat kunci akses bersama"} value={nextAccessKey} onChange={(event) => onNextAccessKeyChange(event.target.value)} />
-                        <Button type="submit" disabled={loading || !nextAccessKey || (hasAccessKey && !currentAccessKey)}>{hasAccessKey ? "Ganti Kunci" : "Simpan Kunci"}</Button>
-                    </form>
-                </CardContent>
-            </Card>
-        </div>
-    )
-}
-
 export function AddAccountPanel({ loading, newAccountCredential, onAddAccount, onCredentialChange }: Pick<AdminDashboardProps, "loading" | "newAccountCredential" | "onAddAccount" | "onCredentialChange">) {
     return (
         <Card id="add-account" className="brand-panel-berry">
             <CardHeader>
                 <CardTitle>Tambah Akun Outlook</CardTitle>
-                <CardDescription>Akun akan dienkripsi menggunakan kunci akses bersama dari halaman Pengaturan.</CardDescription>
+                            <CardDescription>Akun akan divalidasi ke Microsoft lalu disimpan secara terenkripsi.</CardDescription>
             </CardHeader>
             <CardContent>
                 <form onSubmit={onAddAccount} className="grid gap-3 md:grid-cols-[1fr_auto]">
                     <Input placeholder="email:password:refresh_token:client_id atau pakai pemisah |" value={newAccountCredential} onChange={(event) => onCredentialChange(event.target.value)} />
                     <Button type="submit" disabled={loading || !newAccountCredential}>Tambah</Button>
                 </form>
-                <p className="mt-3 text-xs text-muted-foreground">Atur kunci akses bersama terlebih dahulu sebelum menambahkan akun.</p>
+                <p className="mt-3 text-xs text-muted-foreground">Credential hanya disimpan jika refresh token berhasil divalidasi.</p>
             </CardContent>
         </Card>
     )
