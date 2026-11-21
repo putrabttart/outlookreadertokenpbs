@@ -1,0 +1,23 @@
+-- Patch flow token public satu kali pakai.
+-- SQL patch yang dapat langsung dijalankan tersedia di:
+-- supabase/migrations/202609170008_public_access_tokens.sql
+--
+-- Jalankan SELURUH isi migration tersebut sebagai satu query melalui:
+-- Supabase Dashboard > SQL Editor > New query > Run.
+--
+-- Patch membuat:
+-- 1. Tabel public.account_access_tokens.
+-- 2. RPC admin_create_access_token dan admin_revoke_access_token.
+-- 3. RPC redeem_access_token, resume_access_session, dan claim_access_message.
+-- 4. Policy RLS dan privilege minimum untuk flow token publik.
+--
+-- Migration aman dijalankan pada database yang telah menjalankan migration
+-- 202609170001 sampai 202609170007.
+--
+-- Setelah itu jalankan migration lanjutan berikut jika sudah menggunakan
+-- migration 202609170008 dan 202609170009:
+-- supabase/migrations/202609170010_fix_public_inbox_logging.sql
+-- Untuk database yang sudah menjalankan 009-011, jalankan juga:
+-- supabase/migrations/202609170012_reliable_public_inbox_logging.sql
+-- Setelah migration 012 diterapkan, frontend harus mengirim parameter RPC
+-- dengan prefix p_: p_session_secret, p_message_id, dan seterusnya.
