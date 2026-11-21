@@ -128,14 +128,33 @@ function AdminTopbar({ loading, onRefresh, onSignOut }: Pick<AdminDashboardProps
                     <Button variant="outline" onClick={onSignOut}>Keluar</Button>
                 </div>
             </div>
-            <nav className="mt-3 flex gap-2 overflow-x-auto pb-1 lg:hidden">
-                <NavLink to="/admin" end className={adminNavClass}><LayoutDashboard className="h-4 w-4" /> Ringkasan</NavLink>
-                <NavLink to="/admin/add-account" className={adminNavClass}><LockKeyhole className="h-4 w-4" /> Tambah</NavLink>
-                <NavLink to="/admin/accounts" className={adminNavClass}><Users className="h-4 w-4" /> Akun</NavLink>
-                <NavLink to="/admin/logs" className={adminNavClass}><Mail className="h-4 w-4" /> Log</NavLink>
-                <NavLink to="/admin/settings" className={adminNavClass}><Settings className="h-4 w-4" /> Setting</NavLink>
-            </nav>
         </header>
+    )
+}
+
+function AdminBottomBar() {
+    const items = [
+        { to: "/admin", label: "Ringkasan", icon: LayoutDashboard, end: true },
+        { to: "/admin/add-account", label: "Tambah", icon: LockKeyhole },
+        { to: "/admin/accounts", label: "Akun", icon: Users },
+        { to: "/admin/logs", label: "Log", icon: Mail },
+        { to: "/admin/settings", label: "Setting", icon: Settings },
+    ]
+
+    return (
+        <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t-3 border-foreground bg-[#FFF8F9]/95 px-1 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_0_#DB8291] backdrop-blur lg:hidden" aria-label="Navigasi admin">
+            {items.map(({ to, label, icon: Icon, end }) => (
+                <NavLink
+                    key={to}
+                    to={to}
+                    end={end}
+                    className={({ isActive }) => `flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 py-2 text-[10px] font-black transition-colors ${isActive ? "bg-[#720002] text-white" : "text-[#720002]"}`}
+                >
+                    <Icon className="h-5 w-5" />
+                    <span className="truncate">{label}</span>
+                </NavLink>
+            ))}
+        </nav>
     )
 }
 
@@ -145,12 +164,13 @@ export function AdminShell({ loading, onRefresh, onSignOut, children }: Pick<Adm
             <div className="flex min-h-screen">
                 <AdminSidebar />
                 <div className="flex min-w-0 flex-1 flex-col">
-                    <AdminTopbar loading={loading} onRefresh={onRefresh} onSignOut={onSignOut} />
-                    <main className="flex-1 space-y-6 p-4 md:p-6">{children}</main>
-                    <footer className="border-t-3 border-foreground bg-[#720002] px-4 py-3 text-xs font-black text-[#F4D6DC] md:px-6">
-                        Admin dashboard berjalan di Vercel dan terhubung ke Supabase Auth, Database, dan RLS.
-                    </footer>
-                </div>
+                     <AdminTopbar loading={loading} onRefresh={onRefresh} onSignOut={onSignOut} />
+                     <main className="flex-1 space-y-6 p-4 pb-24 md:p-6 md:pb-6">{children}</main>
+                     <footer className="border-t-3 border-foreground bg-[#720002] px-4 py-3 text-xs font-black text-[#F4D6DC] md:px-6">
+                         Admin dashboard berjalan di Vercel dan terhubung ke Supabase Auth, Database, dan RLS.
+                     </footer>
+                     <AdminBottomBar />
+                 </div>
             </div>
         </div>
     )
