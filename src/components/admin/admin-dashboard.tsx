@@ -264,67 +264,87 @@ export function AccountListPanel({
     onGenerateToken,
     onRevokeToken,
 }: AccountListPanelProps) {
-    const selectedAccount = accounts.find((account) => account.id === selectedAccountId)
-    const selectedTokens = accessTokens.filter((token) => token.account_id === selectedAccountId)
+    const [managedAccountId, setManagedAccountId] = useState<string | null>(null)
+    const managedAccount = accounts.find((account) => account.id === managedAccountId)
+    const managedTokens = accessTokens.filter((token) => token.account_id === managedAccountId)
+
+    const openTokenManager = (accountId: string) => {
+        setManagedAccountId(accountId)
+        onFilterChange(accountId)
+    }
+
+    const closeTokenManager = () => {
+        setManagedAccountId(null)
+        onClearFilter()
+    }
 
     return (
-        <Card id="accounts" className="brand-panel-berry overflow-hidden">
-            <CardHeader>
-                <div className="flex items-center justify-between gap-3">
+        <>
+            <Card id="accounts" className="brand-panel-berry overflow-hidden">
+                <CardHeader>
                     <div>
                         <CardTitle>Akun di Database</CardTitle>
-                        <CardDescription>Klik card untuk mengelola token akses akun.</CardDescription>
+                        <CardDescription>Klik card akun untuk membuka pengelola token.</CardDescription>
                     </div>
-                    {selectedAccountId && <Button variant="outline" size="sm" onClick={onClearFilter}>Semua log</Button>}
-                </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-                {accounts.length === 0 ? (
-                    <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">Belum ada akun tersimpan.</p>
-                ) : accounts.map((account) => (
-                    <div
-                        key={account.id}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => onFilterChange(account.id)}
-                        onKeyDown={(event) => {
-                            if (event.key === "Enter" || event.key === " ") {
-                                event.preventDefault()
-                                onFilterChange(account.id)
-                            }
-                        }}
-                        className={`w-full rounded-sm border-3 border-foreground p-3 text-left shadow-[4px_4px_0_#190304] transition-colors ${selectedAccountId === account.id ? "bg-[#DB8291]" : "bg-white hover:bg-[#F4D6DC]"}`}
-                    >
-                        <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                                <p className="truncate text-sm font-semibold text-foreground hover:text-primary hover:underline">{account.email}</p>
-                                {account.is_admin_managed && <p className="mt-1 text-xs font-black text-[#720002]">Admin-managed</p>}
-                                <p className="mt-1 truncate text-xs text-muted-foreground">Client ID: {account.client_id}</p>
-                                <p className="mt-1 text-xs text-muted-foreground">Dibuat: {new Date(account.created_at_ms).toLocaleString()}</p>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                    {accounts.length === 0 ? (
+                        <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">Belum ada akun tersimpan.</p>
+                    ) : accounts.map((account) => (
+                        <div
+                            key={account.id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => openTokenManager(account.id)}
+                            onKeyDown={(event) => {
+                                if (event.key === "Enter" || event.key === " ") {
+                                    event.preventDefault()
+                                    openTokenManager(account.id)
+                                }
+                            }}
+                            className={`w-full rounded-sm border-3 border-foreground p-3 text-left shadow-[4px_4px_0_#190304] transition-colors ${selectedAccountId === account.id ? "bg-[#DB8291]" : "bg-white hover:bg-[#F4D6DC]"}`}
+                        >
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <p className="truncate text-sm font-semibold text-foreground hover:text-primary hover:underline">{account.email}</p>
+                                    {account.is_admin_managed && <p className="mt-1 text-xs font-black text-[#720002]">Admin-managed</p>}
+                                    <p className="mt-1 truncate text-xs text-muted-foreground">Client ID: {account.client_id}</p>
+                                    <p className="mt-1 text-xs text-muted-foreground">Dibuat: {new Date(account.created_at_ms).toLocaleString()}</p>
+                                </div>
+                                <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    onClick={(event) => {
+                                        event.stopPropagation()
+                                        onDeleteAccount(account.id)
+                                    }}
+                                    className="text-destructive hover:text-destructive"
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
                             </div>
-                            <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                onClick={(event) => {
-                                    event.stopPropagation()
-                                    onDeleteAccount(account.id)
-                                }}
-                                className="text-destructive hover:text-destructive"
-                            >
-                                <Trash2 className="h-4 w-4" />
-                            </Button>
                         </div>
-                    </div>
-                ))}
+                    ))}
+                </CardContent>
+            </Card>
 
-                {selectedAccount && (
-                    <section className="mt-6 rounded-sm border-3 border-foreground bg-[#F4D6DC] p-4 text-[#2a0709] shadow-[4px_4px_0_#190304]">
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <Dialog open={Boolean(managedAccount)} onOpenChange={(open) => !open && closeTokenManager()}>
+                <DialogContent className="max-h-[90vh] overflow-hidden border-3 border-foreground p-0 sm:max-w-2xl">
+                    <DialogHeader className="border-b-3 border-foreground bg-[#F4D6DC] p-5 pr-12 text-left">
+                        <DialogTitle>Kelola Token Akses</DialogTitle>
+                        <DialogDescription className="truncate font-bold text-[#720002]">
+                            {managedAccount?.email}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {managedAccount && (
+                        <div className="overflow-y-auto p-5 text-[#2a0709]">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div className="min-w-0">
-                                <p className="text-xs font-black uppercase tracking-wider text-[#720002]/60">Kelola token</p>
-                                <h3 className="truncate font-black text-[#720002]">{selectedAccount.email}</h3>
+                                    <p className="text-xs font-black uppercase tracking-wider text-[#720002]/60">Token untuk akun</p>
+                                    <h3 className="truncate font-black text-[#720002]">{managedAccount.email}</h3>
                             </div>
-                            <Button onClick={() => onGenerateToken(selectedAccount.id)} disabled={loading} className="shrink-0">
+                                <Button onClick={() => onGenerateToken(managedAccount.id)} disabled={loading} className="shrink-0">
                                 <KeyRound className="h-4 w-4" /> Generate Token
                             </Button>
                         </div>
@@ -347,9 +367,9 @@ export function AccountListPanel({
                         )}
 
                         <div className="mt-4 space-y-2">
-                            {selectedTokens.length === 0 ? (
+                                {managedTokens.length === 0 ? (
                                 <p className="rounded-sm border-2 border-dashed border-[#720002]/40 bg-white/60 p-4 text-center text-sm font-bold text-[#720002]/65">Belum ada token untuk akun ini.</p>
-                            ) : selectedTokens.map((token) => (
+                                ) : managedTokens.map((token) => (
                                 <div key={token.id} className="flex items-center justify-between gap-3 rounded-sm border-2 border-[#720002] bg-white p-3">
                                     <div className="min-w-0">
                                         <div className="flex flex-wrap items-center gap-2">
@@ -371,10 +391,11 @@ export function AccountListPanel({
                                 </div>
                             ))}
                         </div>
-                    </section>
-                )}
-            </CardContent>
-        </Card>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
+        </>
     )
 }
 
