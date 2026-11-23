@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { decryptAccount } from "@/lib/crypto"
 import { exchangeRefreshToken, fetchMessageDetail, type MessageDetail } from "@/lib/graph"
 import { loadAdminAccessKey, type AccountAccessTokenRow, type InboxLogRow, type SupabaseAccountRow } from "@/lib/supabase"
-import { ChevronLeft, ChevronRight, Copy, KeyRound, LayoutDashboard, LockKeyhole, Mail, RefreshCcw, Search, ShieldCheck, Trash2, Users, XCircle } from "lucide-react"
+import { ChevronLeft, ChevronRight, Copy, KeyRound, LayoutDashboard, LockKeyhole, Mail, RefreshCcw, Search, Settings, ShieldCheck, Trash2, Users, XCircle } from "lucide-react"
 import { NavLink } from "react-router-dom"
 import DOMPurify from "dompurify"
 
@@ -95,6 +95,7 @@ function AdminSidebar() {
                 <NavLink to="/admin/add-account" className={adminNavClass}><LockKeyhole className="h-4 w-4" /> Tambah Akun</NavLink>
                 <NavLink to="/admin/accounts" className={adminNavClass}><Users className="h-4 w-4" /> Akun</NavLink>
                 <NavLink to="/admin/logs" className={adminNavClass}><Mail className="h-4 w-4" /> Log Email</NavLink>
+                <NavLink to="/admin/settings" className={adminNavClass}><Settings className="h-4 w-4" /> Pengaturan</NavLink>
             </nav>
             <div className="border-t-3 border-foreground bg-[#DB8291] p-4 text-xs font-black text-[#720002]">Data akun tetap terenkripsi di Supabase.</div>
         </aside>
@@ -127,6 +128,7 @@ function AdminBottomBar() {
         { to: "/admin/add-account", label: "Tambah", icon: LockKeyhole },
         { to: "/admin/accounts", label: "Akun", icon: Users },
         { to: "/admin/logs", label: "Log", icon: Mail },
+        { to: "/admin/settings", label: "Atur", icon: Settings },
     ]
 
     return (

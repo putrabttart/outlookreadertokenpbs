@@ -4,6 +4,8 @@ import { Check, Clock3, Copy, KeyRound, LogOut, MailCheck, RefreshCcw, ShieldChe
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { decryptAccount, encryptAccount, type EncryptedAccountRecord } from "@/lib/crypto"
+import { defaultEmailFilterSettings, matchesEmailFilter } from "@/lib/email-filter"
+import { loadPublicEmailFilter } from "@/lib/supabase"
 import type { ParsedCredential } from "@/lib/validation"
 import { exchangeRefreshToken, fetchInbox, fetchMessageDetail, getFriendlyEmailError, type InboxMessage, type MessageDetail } from "@/lib/graph"
 import {
@@ -98,14 +100,15 @@ export function PublicAccessPage() {
                 const inbox = await fetchInbox(auth.accessToken)
                 discoveredMessages = inbox.messages
                 const activatedAt = new Date(activeSession.activated_at).getTime()
-                const candidates = inbox.messages
-                    .filter((item) => new Date(item.receivedDateTime).getTime() > activatedAt)
+                const newMessages = inbox.messages.filter((item) => new Date(item.receivedDateTime).getTime() > activatedAt)
+                const emailFilter = await loadPublicEmailFilter(secret) ?? defaultEmailFilterSettings
+                const candidates = newMessages
+                    .filter((item) => matchesEmailFilter(item, emailFilter))
                     .sort((left, right) => new Date(left.receivedDateTime).getTime() - new Date(right.receivedDateTime).getTime())
 
-                // Logging must not prevent the token queue from claiming a
-                // message when an older database has not applied the logging
-                // migration yet.
-                await Promise.all(candidates.map(async (candidate) => {
+                // Keep the admin audit log complete. The filter only controls
+                // which messages are eligible for public-token delivery.
+                await Promise.all(newMessages.map(async (candidate) => {
                     try {
                         await logPublicInboxMessage(secret, candidate)
                     } catch (logError) {

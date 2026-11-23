@@ -10,6 +10,7 @@ import {
     LatestLogsPreview,
     StatCards,
 } from "@/components/admin/admin-dashboard"
+import { EmailFilterSettingsPanel } from "@/components/admin/email-filter-settings"
 import {
     addAdminManagedAccount,
     adminSignIn,
@@ -22,10 +23,12 @@ import {
     loadAdminAccounts,
     loadAdminAccessTokens,
     loadAdminInboxLogs,
+    loadAdminEmailFilters,
     revokeAdminAccessToken,
     type AccountAccessTokenRow,
     type InboxLogRow,
     type SupabaseAccountRow,
+    type AccountEmailFilterRow,
 } from "@/lib/supabase"
 import { toast } from "sonner"
 
@@ -40,20 +43,23 @@ export function AdminPage() {
     const [newAccountCredential, setNewAccountCredential] = useState("")
     const [accessTokens, setAccessTokens] = useState<AccountAccessTokenRow[]>([])
     const [generatedToken, setGeneratedToken] = useState<string | null>(null)
+    const [emailFilters, setEmailFilters] = useState<AccountEmailFilterRow[]>([])
 
     const loadAdminData = async () => {
         setLoading(true)
         try {
-            const [accountRows, logRows, tokenRows] = await Promise.all([
+            const [accountRows, logRows, tokenRows, filterRows] = await Promise.all([
                 loadAdminAccounts(),
                 // Logs are global admin history; accountId only controls the
                 // selected account/token management view.
                 loadAdminInboxLogs(),
                 loadAdminAccessTokens(),
+                loadAdminEmailFilters(),
             ])
             setAccounts(accountRows)
             setLogs(logRows)
             setAccessTokens(tokenRows)
+            setEmailFilters(filterRows)
         } catch (error: unknown) {
             toast.error(error instanceof Error ? error.message : "Gagal memuat data admin")
         } finally {
@@ -273,6 +279,7 @@ export function AdminPage() {
                         />
                     }
                 />
+                <Route path="settings" element={<EmailFilterSettingsPanel accounts={accounts} filterRows={emailFilters} />} />
                 <Route path="*" element={<Navigate to="/admin" replace />} />
             </Routes>
         </AdminShell>

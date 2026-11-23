@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js"
 import { decryptAccount, encryptAccount, type EncryptedAccountRecord } from "./crypto"
 import { exchangeRefreshToken, fetchInbox, type InboxMessage } from "./graph"
 import { parseCredentialString } from "./validation"
+import type { EmailFilterSettings } from "./email-filter"
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
@@ -51,6 +52,10 @@ export interface ManagedAccountSummary {
     email: string
     client_id: string
     created_at_ms: number
+}
+
+export interface AccountEmailFilterRow extends EmailFilterSettings {
+    account_id: string
 }
 
 export type AccessTokenStatus = "unused" | "waiting" | "used" | "revoked"
@@ -270,6 +275,49 @@ export async function loadAdminInboxLogs(accountId?: string): Promise<InboxLogRo
     const { data, error } = await query
     if (error) throw error
     return data as InboxLogRow[]
+}
+
+export async function loadAdminEmailFilters(): Promise<AccountEmailFilterRow[]> {
+    if (!supabase) return []
+    const { data, error } = await supabase.from("account_email_filters").select("account_id, enabled, description, sender, subject_contains, body_contains")
+    if (error) throw error
+    return (data || []).map((row) => ({
+        account_id: row.account_id,
+        enabled: row.enabled,
+        description: row.description,
+        sender: row.sender,
+        subjectContains: row.subject_contains,
+        bodyContains: row.body_contains,
+    }))
+}
+
+export async function saveAdminEmailFilters(accountIds: string[], settings: EmailFilterSettings): Promise<void> {
+    if (!supabase || accountIds.length === 0) return
+    const rows = accountIds.map((account_id) => ({
+        account_id,
+        enabled: settings.enabled,
+        description: settings.description,
+        sender: settings.sender,
+        subject_contains: settings.subjectContains,
+        body_contains: settings.bodyContains,
+    }))
+    const { error } = await supabase.from("account_email_filters").upsert(rows, { onConflict: "account_id" })
+    if (error) throw error
+}
+
+export async function loadPublicEmailFilter(sessionSecret: string): Promise<EmailFilterSettings | null> {
+    if (!supabase) return null
+    const { data, error } = await supabase.rpc("get_public_email_filter", { session_secret: sessionSecret })
+    if (error) throw error
+    const result = Array.isArray(data) ? data[0] : data
+    if (!result) return null
+    return {
+        enabled: result.enabled,
+        description: "",
+        sender: result.sender,
+        subjectContains: result.subject_contains,
+        bodyContains: result.body_contains,
+    }
 }
 
 export async function loadAdminAccessTokens(accountId?: string): Promise<AccountAccessTokenRow[]> {
