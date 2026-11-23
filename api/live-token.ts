@@ -15,6 +15,13 @@ export default async function handler(req: Request) {
 
         const data = await tokenResponse.json();
 
+        if (tokenResponse.ok && (typeof data.access_token !== 'string' || data.access_token.trim().length < 20)) {
+            return new Response(JSON.stringify({ error: 'OAuth provider returned an invalid access token' }), {
+                status: 502,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
+
         return new Response(JSON.stringify(data), {
             status: tokenResponse.status,
             headers: {
@@ -24,7 +31,7 @@ export default async function handler(req: Request) {
                 'Access-Control-Allow-Headers': 'Content-Type'
             }
         });
-    } catch (error) {
+    } catch {
         return new Response(JSON.stringify({ error: 'Proxy failed to reach Live OAuth' }), {
             status: 502,
             headers: { 'Content-Type': 'application/json' }

@@ -36,7 +36,7 @@ export function getFriendlyEmailError(error: unknown): string {
     const normalized = message.toLowerCase()
 
     if (normalized.includes("invalid_grant") || normalized.includes("invalid token") || normalized.includes("token has expired")) {
-        return "Akun ini tidak dapat dibuka karena token aksesnya sudah tidak berlaku. Hubungi admin untuk memperbarui akun."
+        return "Akun ini ditolak Microsoft (invalid_grant). Refresh token di database sudah kedaluwarsa/ter-revoke atau sudah terpakai setelah rotasi. Perbarui credential akun."
     }
     if (normalized.includes("invalid_client") || normalized.includes("client secret")) {
         return "Konfigurasi aplikasi Microsoft untuk akun ini tidak valid. Hubungi admin."
@@ -49,6 +49,9 @@ export function getFriendlyEmailError(error: unknown): string {
     }
     if (normalized.includes("failed to fetch") || normalized.includes("network") || normalized.includes("fetcherror")) {
         return "Tidak dapat terhubung ke Microsoft. Periksa koneksi internet lalu coba lagi."
+    }
+    if (normalized.includes("proxy failed") || normalized.includes("/api/token") || normalized.includes("method not allowed")) {
+        return "Proxy OAuth /api/token tidak tersedia atau salah konfigurasi di deployment. Pastikan API Vercel ikut ter-deploy."
     }
     if (normalized.includes("rate limit") || normalized.includes("too many requests")) {
         return "Terlalu banyak permintaan ke Microsoft. Tunggu sebentar lalu coba lagi."
@@ -111,8 +114,20 @@ async function exchangeRefreshTokenWithScope(account: ParsedCredential, scope: s
         throw new Error(`${mode.toUpperCase()}_TOKEN_EXCHANGE_FAILED${errorCode}: ${errorDesc}`)
     }
 
+    if (typeof data.access_token !== "string" || data.access_token.trim().length < 20) {
+        console.error("[OAuth Exchange Invalid Response]:", {
+            mode,
+            status: res.status,
+            hasAccessToken: typeof data.access_token === "string",
+            accessTokenLength: typeof data.access_token === "string" ? data.access_token.length : 0,
+            hasRefreshToken: typeof data.refresh_token === "string",
+            error: data.error,
+        })
+        throw new Error(`${mode.toUpperCase()}_TOKEN_EXCHANGE_FAILED: OAuth proxy returned no valid access token`)
+    }
+
     return {
-        accessToken: data.access_token,
+        accessToken: data.access_token.trim(),
         expiresIn: data.expires_in,
         refreshToken: data.refresh_token || account.refreshToken,
         mode,
@@ -121,12 +136,12 @@ async function exchangeRefreshTokenWithScope(account: ParsedCredential, scope: s
 
 /**
  * Some Outlook refresh tokens were issued with a delegated scope while others
- * were issued for an app's .default permissions. Try both Microsoft-supported
- * Graph scopes so either kind can be used by the reader.
+ * were issued for an app's .default permissions. Try both modes: Microsoft can
+ * reject one requested scope even when the same refresh token is usable with
+ * the other mode.
  */
 export async function exchangeRefreshToken(account: ParsedCredential): Promise<TokenResponse> {
     const attempts: Array<[string | null, "oauth2" | "graph"]> = [
-        [null, "oauth2"],
         ["https://graph.microsoft.com/Mail.Read offline_access", "oauth2"],
         ["https://graph.microsoft.com/.default", "graph"],
     ]
@@ -137,11 +152,6 @@ export async function exchangeRefreshToken(account: ParsedCredential): Promise<T
             return await exchangeRefreshTokenWithScope(account, scope, mode)
         } catch (error) {
             lastError = error
-            // A rejected refresh token cannot be repaired by changing scopes.
-            // Stop here instead of generating three identical 400 requests.
-            if (error instanceof Error && error.message.includes("[invalid_grant]")) {
-                throw error
-            }
         }
     }
 

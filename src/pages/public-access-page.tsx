@@ -3,7 +3,7 @@ import DOMPurify from "dompurify"
 import { Check, Clock3, Copy, KeyRound, LogOut, MailCheck, RefreshCcw, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { decryptAccount, type EncryptedAccountRecord } from "@/lib/crypto"
+import { decryptAccount, encryptAccount, type EncryptedAccountRecord } from "@/lib/crypto"
 import type { ParsedCredential } from "@/lib/validation"
 import { exchangeRefreshToken, fetchInbox, fetchMessageDetail, getFriendlyEmailError, type InboxMessage, type MessageDetail } from "@/lib/graph"
 import {
@@ -12,6 +12,7 @@ import {
     logPublicInboxMessage,
     redeemPublicAccessToken,
     resumePublicAccessSession,
+    updatePublicAccountCredential,
     type PublicAccessSession,
 } from "@/lib/supabase"
 
@@ -83,7 +84,10 @@ export function PublicAccessPage() {
             const credential = credentialRef.current ?? await decryptAccount(toEncryptedRecord(activeSession), activeSession.access_key)
             const auth = await exchangeRefreshToken(credential)
             if (auth.refreshToken && auth.refreshToken !== credential.refreshToken) {
-                credentialRef.current = { ...credential, refreshToken: auth.refreshToken }
+                const updatedCredential = { ...credential, refreshToken: auth.refreshToken }
+                const encrypted = await encryptAccount(updatedCredential, activeSession.access_key, activeSession.account_id)
+                await updatePublicAccountCredential(secret, encrypted)
+                credentialRef.current = updatedCredential
             } else if (!credentialRef.current) {
                 credentialRef.current = credential
             }

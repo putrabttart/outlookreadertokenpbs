@@ -30,6 +30,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         })
 
         const data = await tokenResponse.json()
+        if (tokenResponse.ok && (typeof data.access_token !== 'string' || data.access_token.trim().length < 20)) {
+            res.status(502).json({ error: 'OAuth provider returned an invalid access token' })
+            return
+        }
         res.status(tokenResponse.status).json(data)
     } catch {
         res.status(502).json({ error: 'Proxy failed to reach Live OAuth' })

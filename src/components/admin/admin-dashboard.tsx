@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { decryptAccount } from "@/lib/crypto"
 import { exchangeRefreshToken, fetchMessageDetail, type MessageDetail } from "@/lib/graph"
 import { loadAdminAccessKey, type AccountAccessTokenRow, type InboxLogRow, type SupabaseAccountRow } from "@/lib/supabase"
-import { Copy, KeyRound, LayoutDashboard, LockKeyhole, Mail, RefreshCcw, ShieldCheck, Trash2, Users, XCircle } from "lucide-react"
+import { ChevronLeft, ChevronRight, Copy, KeyRound, LayoutDashboard, LockKeyhole, Mail, RefreshCcw, Search, ShieldCheck, Trash2, Users, XCircle } from "lucide-react"
 import { NavLink } from "react-router-dom"
 import DOMPurify from "dompurify"
 
@@ -241,8 +241,18 @@ export function AccountListPanel({
     onRevokeToken,
 }: AccountListPanelProps) {
     const [managedAccountId, setManagedAccountId] = useState<string | null>(null)
+    const [searchQuery, setSearchQuery] = useState("")
+    const [currentPage, setCurrentPage] = useState(1)
+    const pageSize = 10
     const managedAccount = accounts.find((account) => account.id === managedAccountId)
     const managedTokens = accessTokens.filter((token) => token.account_id === managedAccountId)
+    const normalizedQuery = searchQuery.trim().toLowerCase()
+    const filteredAccounts = normalizedQuery
+        ? accounts.filter((account) => account.email.toLowerCase().includes(normalizedQuery) || account.client_id.toLowerCase().includes(normalizedQuery))
+        : accounts
+    const totalPages = Math.max(1, Math.ceil(filteredAccounts.length / pageSize))
+    const page = Math.min(currentPage, totalPages)
+    const visibleAccounts = filteredAccounts.slice((page - 1) * pageSize, page * pageSize)
 
     const openTokenManager = (accountId: string) => {
         setManagedAccountId(accountId)
@@ -264,9 +274,24 @@ export function AccountListPanel({
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
+                    <div className="relative">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#720002]/60" />
+                        <Input
+                            value={searchQuery}
+                            onChange={(event) => {
+                                setSearchQuery(event.target.value)
+                                setCurrentPage(1)
+                            }}
+                            placeholder="Cari email atau client ID..."
+                            aria-label="Cari akun"
+                            className="border-2 border-[#720002] bg-white pl-9"
+                        />
+                    </div>
                     {accounts.length === 0 ? (
                         <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">Belum ada akun tersimpan.</p>
-                    ) : accounts.map((account) => (
+                    ) : visibleAccounts.length === 0 ? (
+                        <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">Tidak ada akun yang cocok dengan pencarian.</p>
+                    ) : visibleAccounts.map((account) => (
                         <div
                             key={account.id}
                             role="button"
@@ -301,6 +326,32 @@ export function AccountListPanel({
                             </div>
                         </div>
                     ))}
+                    {filteredAccounts.length > 0 && (
+                        <div className="flex flex-col gap-3 border-t-2 border-[#720002]/20 pt-3 sm:flex-row sm:items-center sm:justify-between">
+                            <p className="text-xs font-bold text-[#720002]/70">
+                                Menampilkan {(page - 1) * pageSize + 1}-{Math.min(page * pageSize, filteredAccounts.length)} dari {filteredAccounts.length} akun
+                            </p>
+                            <div className="flex items-center justify-between gap-2 sm:justify-end">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                                    disabled={page === 1}
+                                >
+                                    <ChevronLeft className="h-4 w-4" /> Sebelumnya
+                                </Button>
+                                <span className="min-w-16 text-center text-sm font-black text-[#720002]">{page} / {totalPages}</span>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                                    disabled={page === totalPages}
+                                >
+                                    Berikutnya <ChevronRight className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
@@ -417,7 +468,12 @@ export function InboxLogTable({
     const [viewerError, setViewerError] = useState<string | null>(null)
     const [viewerLoading, setViewerLoading] = useState(false)
     const [viewerOpen, setViewerOpen] = useState(false)
+    const [currentPage, setCurrentPage] = useState(1)
+    const pageSize = 10
     const visibleLogs = selectedAccountId ? logs.filter((log) => log.account_id === selectedAccountId) : logs
+    const totalPages = Math.max(1, Math.ceil(visibleLogs.length / pageSize))
+    const page = Math.min(currentPage, totalPages)
+    const paginatedLogs = visibleLogs.slice((page - 1) * pageSize, page * pageSize)
 
     const openMessageForLog = async (log: InboxLogRow) => {
         const adminAccountKey = await loadAdminAccessKey()
@@ -469,7 +525,10 @@ export function InboxLogTable({
                             <CardDescription>Semua pesan yang tercatat ditampilkan. Klik baris untuk membuka isi email.</CardDescription>
                         </div>
                         <div className="flex flex-col gap-2 sm:flex-row">
-                            <select className="rounded-lg border bg-background px-3 py-2 text-sm" value={selectedAccountId} onChange={(event) => onFilterChange(event.target.value)}>
+                             <select className="rounded-lg border bg-background px-3 py-2 text-sm" value={selectedAccountId} onChange={(event) => {
+                                 setCurrentPage(1)
+                                 onFilterChange(event.target.value)
+                             }}>
                                 <option value="">Semua akun</option>
                                 {accounts.map((account) => <option key={account.id} value={account.id}>{account.email}</option>)}
                             </select>
@@ -491,7 +550,7 @@ export function InboxLogTable({
                             <tbody className="divide-y">
                                 {visibleLogs.length === 0 ? (
                                     <tr><td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">Belum ada log email.</td></tr>
-                                ) : visibleLogs.map((log) => (
+                                 ) : paginatedLogs.map((log) => (
                                     <tr
                                         key={log.id}
                                         className={`cursor-pointer align-top hover:bg-[#F4D6DC] ${selectedLog?.id === log.id ? "bg-[#DB8291]/70" : ""}`}
@@ -516,6 +575,32 @@ export function InboxLogTable({
                             </tbody>
                         </table>
                     </div>
+                    {visibleLogs.length > 0 && (
+                        <div className="flex flex-col gap-3 border-t-2 border-[#720002]/20 pt-3 sm:flex-row sm:items-center sm:justify-between">
+                            <p className="text-xs font-bold text-[#720002]/70">
+                                Menampilkan {(page - 1) * pageSize + 1}-{Math.min(page * pageSize, visibleLogs.length)} dari {visibleLogs.length} log
+                            </p>
+                            <div className="flex items-center justify-between gap-2 sm:justify-end">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((value) => Math.max(1, value - 1))}
+                                    disabled={page === 1}
+                                >
+                                    <ChevronLeft className="h-4 w-4" /> Sebelumnya
+                                </Button>
+                                <span className="min-w-16 text-center text-sm font-black text-[#720002]">{page} / {totalPages}</span>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((value) => Math.min(totalPages, value + 1))}
+                                    disabled={page === totalPages}
+                                >
+                                    Berikutnya <ChevronRight className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
             <Dialog open={viewerOpen} onOpenChange={setViewerOpen}>

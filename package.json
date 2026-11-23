@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "migration:build-old-upgrade": "node scripts/build-old-database-upgrade.mjs",
+    "migrate:old-supabase": "node scripts/migrate-old-supabase.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

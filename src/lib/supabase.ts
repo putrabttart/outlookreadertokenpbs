@@ -337,6 +337,21 @@ export async function claimPublicAccessMessage(
     return data as "waiting" | "used" | "revoked" | "invalid"
 }
 
+export async function updatePublicAccountCredential(
+    sessionSecret: string,
+    record: EncryptedAccountRecord,
+): Promise<void> {
+    if (!supabase) return
+    const { data, error } = await supabase.rpc("update_public_account_credential", {
+        session_secret: sessionSecret,
+        next_cipher_text: record.cipherText,
+        next_iv: record.iv,
+        next_salt: record.salt,
+    })
+    if (error) throw error
+    if (data !== true) throw new Error("Sesi token tidak valid untuk memperbarui credential akun")
+}
+
 export async function logPublicInboxMessage(
     sessionSecret: string,
     message: InboxMessage,
