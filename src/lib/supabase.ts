@@ -55,6 +55,7 @@ export interface ManagedAccountSummary {
 }
 
 export interface AccountEmailFilterRow extends EmailFilterSettings {
+    id: string
     account_id: string
 }
 
@@ -279,9 +280,10 @@ export async function loadAdminInboxLogs(accountId?: string): Promise<InboxLogRo
 
 export async function loadAdminEmailFilters(): Promise<AccountEmailFilterRow[]> {
     if (!supabase) return []
-    const { data, error } = await supabase.from("account_email_filters").select("account_id, enabled, description, sender, subject_contains, body_contains")
+    const { data, error } = await supabase.from("account_email_filters").select("id, account_id, enabled, description, sender, subject_contains, body_contains")
     if (error) throw error
     return (data || []).map((row) => ({
+        id: row.id,
         account_id: row.account_id,
         enabled: row.enabled,
         description: row.description,
@@ -291,8 +293,8 @@ export async function loadAdminEmailFilters(): Promise<AccountEmailFilterRow[]> 
     }))
 }
 
-export async function saveAdminEmailFilters(accountIds: string[], settings: EmailFilterSettings): Promise<void> {
-    if (!supabase || accountIds.length === 0) return
+export async function saveAdminEmailFilters(accountIds: string[], settings: EmailFilterSettings): Promise<AccountEmailFilterRow[]> {
+    if (!supabase || accountIds.length === 0) return []
     const rows = accountIds.map((account_id) => ({
         account_id,
         enabled: settings.enabled,
@@ -301,23 +303,43 @@ export async function saveAdminEmailFilters(accountIds: string[], settings: Emai
         subject_contains: settings.subjectContains,
         body_contains: settings.bodyContains,
     }))
-    const { error } = await supabase.from("account_email_filters").upsert(rows, { onConflict: "account_id" })
+    const { data, error } = await supabase.from("account_email_filters").insert(rows).select("id, account_id, enabled, description, sender, subject_contains, body_contains")
+    if (error) throw error
+    return (data || []).map((row) => ({
+        id: row.id,
+        account_id: row.account_id,
+        enabled: row.enabled,
+        description: row.description,
+        sender: row.sender,
+        subjectContains: row.subject_contains,
+        bodyContains: row.body_contains,
+    }))
+}
+
+export async function deleteAdminEmailFilter(filterId: string): Promise<void> {
+    if (!supabase) return
+    const { error } = await supabase.from("account_email_filters").delete().eq("id", filterId)
     if (error) throw error
 }
 
-export async function loadPublicEmailFilter(sessionSecret: string): Promise<EmailFilterSettings | null> {
-    if (!supabase) return null
+export async function deleteAdminAccountEmailFilters(accountIds: string[]): Promise<void> {
+    if (!supabase || accountIds.length === 0) return
+    const { error } = await supabase.from("account_email_filters").delete().in("account_id", accountIds)
+    if (error) throw error
+}
+
+export async function loadPublicEmailFilters(sessionSecret: string): Promise<EmailFilterSettings[]> {
+    if (!supabase) return []
     const { data, error } = await supabase.rpc("get_public_email_filter", { session_secret: sessionSecret })
     if (error) throw error
-    const result = Array.isArray(data) ? data[0] : data
-    if (!result) return null
-    return {
+    const results = Array.isArray(data) ? data : data ? [data] : []
+    return results.map((result) => ({
         enabled: result.enabled,
         description: "",
         sender: result.sender,
         subjectContains: result.subject_contains,
         bodyContains: result.body_contains,
-    }
+    }))
 }
 
 export async function loadAdminAccessTokens(accountId?: string): Promise<AccountAccessTokenRow[]> {

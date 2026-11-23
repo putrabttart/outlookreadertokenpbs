@@ -1,10 +1,10 @@
 import { useState } from "react"
-import { Check, RotateCcw, Search } from "lucide-react"
+import { Check, RotateCcw, Search, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { defaultEmailFilterSettings, type EmailFilterSettings } from "@/lib/email-filter"
-import { saveAdminEmailFilters, type AccountEmailFilterRow, type SupabaseAccountRow } from "@/lib/supabase"
+import { deleteAdminAccountEmailFilters, deleteAdminEmailFilter, saveAdminEmailFilters, type AccountEmailFilterRow, type SupabaseAccountRow } from "@/lib/supabase"
 import { toast } from "sonner"
 
 export function EmailFilterSettingsPanel({ accounts, filterRows }: { accounts: SupabaseAccountRow[]; filterRows: AccountEmailFilterRow[] }) {
@@ -31,11 +31,13 @@ export function EmailFilterSettingsPanel({ accounts, filterRows }: { accounts: S
         setSaving(true)
         setSaved(false)
         try {
-            await saveAdminEmailFilters(accountIds, nextSettings)
-            setStoredFilters((current) => [
-                ...current.filter((filter) => !accountIds.includes(filter.account_id)),
-                ...accountIds.map((account_id) => ({ account_id, ...nextSettings })),
-            ])
+            if (nextSettings.enabled) {
+                const createdFilters = await saveAdminEmailFilters(accountIds, nextSettings)
+                setStoredFilters((current) => [...current, ...createdFilters])
+            } else {
+                await deleteAdminAccountEmailFilters(accountIds)
+                setStoredFilters((current) => current.filter((filter) => !accountIds.includes(filter.account_id)))
+            }
             setSaved(true)
         } catch (error) {
             toast.error(error instanceof Error ? error.message : "Gagal menyimpan filter")
@@ -53,21 +55,31 @@ export function EmailFilterSettingsPanel({ accounts, filterRows }: { accounts: S
         await persistSettings(defaultEmailFilterSettings)
     }
 
+    const handleEnabledChange = async (enabled: boolean) => {
+        update("enabled", enabled)
+        if (!enabled && selectedEmails.length > 0) {
+            await persistSettings({ ...settings, enabled: false })
+        }
+    }
+
+    const handleDeleteFilter = async (filterId: string) => {
+        setSaving(true)
+        try {
+            await deleteAdminEmailFilter(filterId)
+            setStoredFilters((current) => current.filter((filter) => filter.id !== filterId))
+            toast.success("Filter berhasil dihapus")
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Gagal menghapus filter")
+        } finally {
+            setSaving(false)
+        }
+    }
+
     const toggleEmail = (email: string) => {
         setSelectedEmails((current) => {
             if (current.includes(email)) {
-                const next = current.filter((item) => item !== email)
-                const nextAccount = accounts.find((account) => account.email === next[0])
-                const nextFilter = storedFilters.find((filter) => filter.account_id === nextAccount?.id)
-                setSettings(nextFilter ?? defaultEmailFilterSettings)
                 setSaved(false)
-                return next
-            }
-
-            if (current.length === 0) {
-                const account = accounts.find((item) => item.email === email)
-                const filter = storedFilters.find((item) => item.account_id === account?.id)
-                setSettings(filter ?? defaultEmailFilterSettings)
+                return current.filter((item) => item !== email)
             }
             setSaved(false)
             return [...current, email]
@@ -86,7 +98,7 @@ export function EmailFilterSettingsPanel({ accounts, filterRows }: { accounts: S
                 <div className="space-y-3 rounded-xl border-2 border-[#720002] bg-white p-3">
                     <div>
                         <p className="text-sm font-black text-[#720002]">Terapkan filter untuk akun</p>
-                        <p className="text-xs text-[#720002]/65">Pilih satu atau beberapa email. Filter setiap akun dapat berbeda.</p>
+                        <p className="text-xs text-[#720002]/65">Pilih satu atau beberapa email untuk menambahkan filter baru. Satu akun dapat memiliki beberapa filter.</p>
                     </div>
                     {accounts.length === 0 ? <p className="text-sm text-muted-foreground">Belum ada akun.</p> : (
                         <>
@@ -118,11 +130,12 @@ export function EmailFilterSettingsPanel({ accounts, filterRows }: { accounts: S
                     <input
                         type="checkbox"
                         checked={settings.enabled}
-                        onChange={(event) => update("enabled", event.target.checked)}
+                        onChange={(event) => void handleEnabledChange(event.target.checked)}
                         className="h-5 w-5 accent-[#720002]"
                     />
                     Aktifkan filter email
                 </label>
+                <p className="-mt-3 text-xs font-bold text-amber-700">Mematikan checkbox akan menghapus semua filter dari akun yang sedang dipilih.</p>
 
                 <div className="grid gap-4 md:grid-cols-2">
                     <label className="space-y-2 text-sm font-bold text-[#720002] md:col-span-2">
@@ -167,7 +180,7 @@ export function EmailFilterSettingsPanel({ accounts, filterRows }: { accounts: S
 
                 <div className="flex flex-wrap gap-3">
                     <Button onClick={handleSave} disabled={selectedEmails.length === 0 || saving}>
-                        <Check className="h-4 w-4" /> {saving ? "Menyimpan..." : "Simpan filter"}
+                        <Check className="h-4 w-4" /> {saving ? "Menyimpan..." : "Tambah filter"}
                     </Button>
                     <Button variant="outline" onClick={handleReset} disabled={selectedEmails.length === 0 || saving} className="border-[#720002] bg-white text-[#720002] hover:bg-[#F4D6DC] hover:text-[#720002] disabled:text-[#720002]/50">
                         <RotateCcw className="h-4 w-4" /> Kembalikan default
@@ -189,18 +202,24 @@ export function EmailFilterSettingsPanel({ accounts, filterRows }: { accounts: S
                                     <th className="px-3 py-2">Pengirim</th>
                                     <th className="px-3 py-2">Subjek</th>
                                     <th className="px-3 py-2">Isi Email</th>
+                                    <th className="px-3 py-2">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody className="bg-white text-[#190304]">
                                 {activeFilters.length === 0 ? (
-                                    <tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">Belum ada akun dengan filter aktif.</td></tr>
+                                    <tr><td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">Belum ada akun dengan filter aktif.</td></tr>
                                 ) : activeFilters.map((filter) => (
-                                    <tr key={filter.account_id} className="border-t border-[#720002]/20 align-top">
+                                    <tr key={filter.id} className="border-t border-[#720002]/20 align-top">
                                         <td className="px-3 py-2 font-bold text-[#720002]">{filter.email}</td>
                                         <td className="px-3 py-2 text-[#190304]">{filter.description || "-"}</td>
                                         <td className="px-3 py-2 text-[#190304]">{filter.sender || "Semua pengirim"}</td>
                                         <td className="px-3 py-2 text-[#190304]">{filter.subjectContains || "Semua subjek"}</td>
                                         <td className="px-3 py-2 text-[#190304]">{filter.bodyContains || "Semua isi"}</td>
+                                        <td className="px-3 py-2">
+                                            <Button variant="outline" size="sm" onClick={() => void handleDeleteFilter(filter.id)} disabled={saving} className="border-red-700 bg-white text-red-700 hover:bg-red-50 hover:text-red-800">
+                                                <Trash2 className="h-4 w-4" /> Hapus
+                                            </Button>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>

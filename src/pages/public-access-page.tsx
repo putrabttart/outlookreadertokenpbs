@@ -4,8 +4,8 @@ import { Check, Clock3, Copy, KeyRound, LogOut, MailCheck, RefreshCcw, ShieldChe
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { decryptAccount, encryptAccount, type EncryptedAccountRecord } from "@/lib/crypto"
-import { defaultEmailFilterSettings, matchesEmailFilter } from "@/lib/email-filter"
-import { loadPublicEmailFilter } from "@/lib/supabase"
+import { matchesEmailFilter } from "@/lib/email-filter"
+import { loadPublicEmailFilters } from "@/lib/supabase"
 import type { ParsedCredential } from "@/lib/validation"
 import { exchangeRefreshToken, fetchInbox, fetchMessageDetail, getFriendlyEmailError, type InboxMessage, type MessageDetail } from "@/lib/graph"
 import {
@@ -101,9 +101,9 @@ export function PublicAccessPage() {
                 discoveredMessages = inbox.messages
                 const activatedAt = new Date(activeSession.activated_at).getTime()
                 const newMessages = inbox.messages.filter((item) => new Date(item.receivedDateTime).getTime() > activatedAt)
-                const emailFilter = await loadPublicEmailFilter(secret) ?? defaultEmailFilterSettings
+                const emailFilters = await loadPublicEmailFilters(secret)
                 const candidates = newMessages
-                    .filter((item) => matchesEmailFilter(item, emailFilter))
+                    .filter((item) => emailFilters.length === 0 || emailFilters.some((filter) => matchesEmailFilter(item, filter)))
                     .sort((left, right) => new Date(left.receivedDateTime).getTime() - new Date(right.receivedDateTime).getTime())
 
                 // Keep the admin audit log complete. The filter only controls
